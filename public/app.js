@@ -1,4 +1,4 @@
-// app.js (Optimized for Vercel)
+// app.js (Production Edition)
 let currentStory = null;
 
 const $ = id => document.getElementById(id);
@@ -11,13 +11,6 @@ function showBanner(type, msg) {
     const icons = { error: '❌', success: '✅', info: 'ℹ️', warning: '⚠️' };
     banner.innerHTML = `<span>${icons[type] || ''}</span><span>${msg}</span>`;
     show('statusBanner');
-}
-
-function formatNumber(n) {
-    if (!n) return '0';
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return String(n);
 }
 
 function escapeHtml(str) {
@@ -43,20 +36,20 @@ async function fetchStory() {
         currentStory = data;
         renderStoryCard(data);
         show('storyCard');
-        showBanner('success', `Ready: ${data.chapters.length} chapters.`);
+        showBanner('success', `Found ${data.chapters.length} chapters.`);
     } catch (err) {
-        showBanner('error', 'Network error.');
+        showBanner('error', 'Connection error.');
     } finally {
         btn.disabled = false;
     }
 }
 
 function renderStoryCard(data) {
-    const fallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="220"%3E%3Crect width="150" height="220" fill="%237c3aed" rx="8"/%3E%3Ctext x="75" y="115" text-anchor="middle" fill="white" font-size="40"%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E';
-    $('storyCover').src = data.cover || fallback;
+    const fb = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="220"%3E%3Crect width="150" height="220" fill="%237c3aed" rx="8"/%3E%3Ctext x="75" y="115" text-anchor="middle" fill="white" font-size="40"%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E';
+    $('storyCover').src = data.cover || fb;
     $('storyTitle').textContent = data.title;
     $('storyAuthor').textContent = data.author;
-    $('storyChapterCount').textContent = `${data.numParts} Chapters`;
+    $('storyChapterCount').textContent = `${data.chapters.length} Chapters`;
 
     const tmp = document.createElement('div');
     tmp.innerHTML = data.description || '';
@@ -78,15 +71,23 @@ async function downloadPDF() {
 
     const dlBtn = $('downloadBtn');
     dlBtn.disabled = true;
-    dlBtn.innerHTML = '<span class="spinning">⚙️</span><span>Generating PDF...</span>';
+    dlBtn.innerHTML = '<span class="spinning">⚙️</span><span>Building PDF...</span>';
     show('progressCard');
     hide('statusBanner');
 
-    setProgress(20);
-    $('progressSubtitle').textContent = 'Generating PDF on server. This may take a minute for large stories...';
+    let prog = 10;
+    setProgress(prog);
+    $('progressSubtitle').textContent = 'Server is fetching content and building PDF...';
+
+    // "Crawling" progress bar to show life while server works
+    const progInterval = setInterval(() => {
+        if (prog < 85) {
+            prog += Math.random() * 5;
+            setProgress(prog);
+        }
+    }, 600);
 
     try {
-        // We send ONLY metadata. Server fetches content to stay under 4.5MB Vercel limit.
         const res = await fetch('/api/generate-pdf', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -98,9 +99,14 @@ async function downloadPDF() {
             }),
         });
 
-        if (!res.ok) throw new Error('Generation failed (probably too many chapters for Vercel timeout)');
+        clearInterval(progInterval);
 
-        setProgress(90);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Server limit reached.');
+        }
+
+        setProgress(95);
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -113,9 +119,10 @@ async function downloadPDF() {
 
         setProgress(100);
         $('progressSubtitle').textContent = '✅ Download complete!';
-        showBanner('success', 'PDF Downloaded successfully.');
+        showBanner('success', 'PDF saved successfully.');
     } catch (err) {
-        showBanner('error', 'Download aborted (Vercel has a 10s limit for free plans). Try a shorter story or run locally.');
+        clearInterval(progInterval);
+        showBanner('error', `${err.message} (Stories > 80 chapters often exceed Vercel's 10s limit)`);
         hide('progressCard');
     } finally {
         dlBtn.disabled = false;
@@ -123,7 +130,7 @@ async function downloadPDF() {
     }
 }
 
-function setProgress(pct) { $('progressBar').style.width = `${pct}%`; }
+function setProgress(pct) { $('progressBar').style.width = `${Math.min(100, pct)}%`; }
 
 document.addEventListener('DOMContentLoaded', () => {
     $('storyUrl').addEventListener('keydown', e => { if (e.key === 'Enter') fetchStory(); });

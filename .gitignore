@@ -1,5 +1,4 @@
 node_modules/
-fonts/
 .DS_Store
 *.log
 npm-debug.log*
