@@ -1,16 +1,12 @@
 {
     "version": 2,
     "name": "wattpad-downloader",
-    "builds": [
-        {
-            "src": "server.js",
-            "use": "@vercel/node"
-        },
-        {
-            "src": "public/**",
-            "use": "@vercel/static"
+    "functions": {
+        "server.js": {
+            "memory": 1024,
+            "maxDuration": 10
         }
-    ],
+    },
     "routes": [
         {
             "src": "/api/(.*)",
@@ -21,12 +17,6 @@
             "dest": "public/$1"
         }
     ],
-    "functions": {
-        "server.js": {
-            "memory": 1024,
-            "maxDuration": 10
-        }
-    },
     "env": {
         "NODE_OPTIONS": "--max-http-header-size=65536"
     }
