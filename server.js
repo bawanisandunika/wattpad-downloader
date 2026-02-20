@@ -97,22 +97,88 @@ async function fetchChapterContent(id, retry = 1) {
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
 app.get('/api/story', async (req, res) => {
-  const storyId = (req.query.url || '').match(/story\/(\d+)/)?.[1];
-  if (!storyId) return res.status(400).json({ error: 'Valid Wattpad URL required' });
+  const url = req.query.url || '';
+  const storyId = url.match(/story\/(\d+)/)?.[1] || url.match(/-(\d+)(?:-|$)/)?.[1] || url.match(/(\d+).*/)?.[1];
+
+  console.log('🔍 Fetching Story ID:', storyId, 'from URL:', url);
+
+  if (!storyId || !/^\d+$/.test(storyId)) {
+    return res.status(400).json({ error: 'Could not find a valid Story ID in that URL.' });
+  }
+
   try {
-    const { data } = await axios.get(`https://www.wattpad.com/api/v3/stories/${storyId}?fields=id,title,user(name),description,cover,parts(id,title)`, { headers: BASE_HEADERS, timeout: 5000 });
-    res.json({
-      title: data.title, author: data.user?.name, cover: data.cover, description: data.description,
-      chapters: (data.parts || []).map((p, i) => ({ index: i + 1, id: p.id, title: p.title }))
+    // Try V3 first
+    let { data } = await axios.get(`https://www.wattpad.com/api/v3/stories/${storyId}?fields=id,title,user(name),description,cover,parts(id,title)`, {
+      headers: BASE_HEADERS,
+      timeout: 6000,
+      transformResponse: [d => d] // Get raw string for robust parsing
     });
+
+    let storyData = { title: 'Untitled', author: 'Unknown', chapters: [] };
+
+    // Try to parse as JSON first
+    try {
+      const json = JSON.parse(data);
+      if (json.id) {
+        storyData.title = json.title;
+        storyData.author = json.user?.name;
+        storyData.cover = json.cover;
+        storyData.description = json.description;
+        storyData.chapters = (json.parts || []).map((p, i) => ({ index: i + 1, id: p.id, title: p.title }));
+      }
+    } catch (e) {
+      console.log('⚠️ Story V3 JSON parse failed, attempting regex/legacy parsing...');
+    }
+
+    // Fallback: If no chapters found, try to regex the "PHP Array" output
+    if (storyData.chapters.length === 0) {
+      console.log('🔄 Chapters empty, trying fallback parsing on raw response...');
+      const IDs = [...data.matchAll(/'id'\s*=>\s*(\d+)/g)].map(m => m[1]);
+      const titles = [...data.matchAll(/'title'\s*=>\s*'(.*?)'/g)].map(m => m[1]);
+      if (IDs.length > 0) {
+        storyData.chapters = IDs.map((id, i) => ({ index: i + 1, id, title: titles[i] || `Chapter ${i + 1}` }));
+        console.log(`✅ Extracted ${IDs.length} chapters via regex fallback.`);
+      }
+    }
+
+    // NEW METADATA SCRAPING FALLBACK (for Title/Author/Cover)
+    if (storyData.title === 'Untitled' || !storyData.cover) {
+      console.log('� Metadata missing, scraping story page directly...');
+      try {
+        const pageRes = await axios.get(url, { headers: BASE_HEADERS, timeout: 5000 });
+        const $ = cheerio.load(pageRes.data);
+
+        storyData.title = $('meta[property="og:title"]').attr('content') || $('.story-info__title').text().trim() || storyData.title;
+        storyData.author = $('meta[property="og:author"]').attr('content') || $('.author-info__username').text().trim() || storyData.author;
+        storyData.cover = $('meta[property="og:image"]').attr('content') || $('.story-cover img').attr('src') || storyData.cover;
+        storyData.description = $('meta[property="og:description"]').attr('content') || $('.description-text').text().trim() || storyData.description;
+
+        console.log('✅ Scraped Metadata:', { title: storyData.title, author: storyData.author });
+      } catch (scrapeError) {
+        console.error('⚠️ Scraping fallback failed:', scrapeError.message);
+      }
+    }
+
+    console.log('📦 Final Story Metadata Chapters:', storyData.chapters.length);
+    res.json(storyData);
+
   } catch (e) {
-    res.status(500).json({ error: 'Story fetch failed' });
+    console.error('❌ Story metadata fetch failed:', e.message);
+    res.status(500).json({ error: 'Failed to fetch story metadata from Wattpad.' });
   }
 });
 
 app.post('/api/generate-pdf', async (req, res) => {
   const { title, author, description, chapters } = req.body;
-  if (!title || !chapters) return res.status(400).json({ error: 'Missing data' });
+
+  // Debug: Log the full body to see what's actually coming through
+  console.log('📄 PDF Request Full Body:', JSON.stringify(req.body, null, 2));
+
+  console.log('📄 PDF Request Summary:', { title, author, chaptersCount: chapters?.length });
+  if (!title || !chapters || !Array.isArray(chapters)) {
+    console.error('❌ Validation Failed:', { title: !!title, chapters: !!chapters, isArray: Array.isArray(chapters) });
+    return res.status(400).json({ error: 'Missing or invalid data: title and chapters (array) are required.' });
+  }
 
   try {
     if (!_sessionCookies) await refreshSession();
@@ -175,4 +241,7 @@ app.post('/api/generate-pdf', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Lightning Server on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`\n🚀 Server is running locally!`);
+  console.log(`🔗 Open in browser: \x1b[36mhttp://localhost:${PORT}\x1b[0m\n`);
+});

@@ -34,6 +34,7 @@ async function fetchStory() {
         if (!res.ok) { showBanner('error', data.error || 'Failed to load.'); return; }
 
         currentStory = data;
+        console.log('📚 Story Fetched:', data);
         renderStoryCard(data);
         show('storyCard');
         showBanner('success', `Found ${data.chapters.length} chapters.`);
@@ -67,7 +68,10 @@ function renderStoryCard(data) {
 
 // ─── Download PDF ──────────────────────────────────────────────────────────────
 async function downloadPDF() {
-    if (!currentStory) return;
+    if (!currentStory || !currentStory.chapters || currentStory.chapters.length === 0) {
+        showBanner('error', 'Cannot generate PDF: No chapters found for this story.');
+        return;
+    }
 
     const dlBtn = $('downloadBtn');
     dlBtn.disabled = true;
