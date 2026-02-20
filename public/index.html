@@ -1,0 +1,126 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wattpad PDF Downloader</title>
+  <meta name="description"
+    content="Download any Wattpad story as a beautifully formatted PDF. Paste a story URL and get a complete PDF in seconds." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- Background bubbles -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <main class="container">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">📖</span>
+        <span class="logo-text">Wattpad <span class="accent">PDF</span></span>
+      </div>
+      <p class="tagline">Download any Wattpad story as a beautiful, formatted PDF</p>
+    </header>
+
+    <!-- Input Card -->
+    <section class="card input-card">
+      <label class="input-label" for="storyUrl">Paste your Wattpad story URL</label>
+      <div class="input-row">
+        <div class="input-wrapper">
+          <span class="input-icon">🔗</span>
+          <input id="storyUrl" type="url" class="url-input"
+            placeholder="https://www.wattpad.com/story/123456789-story-title" autocomplete="off" spellcheck="false" />
+        </div>
+        <button id="fetchBtn" class="btn btn-primary" onclick="fetchStory()">
+          <span class="btn-text">Fetch Story</span>
+          <span class="btn-icon">✨</span>
+        </button>
+      </div>
+      <p class="input-hint">Use the main <code>/story/</code> URL for best results. <strong>Note:</strong> For mature
+        stories, add your Wattpad login cookies to server.js for full chapter text.</p>
+    </section>
+
+    <!-- Status / Error Banner -->
+    <div id="statusBanner" class="status-banner hidden"></div>
+
+    <!-- Story Info Card (hidden until fetched) -->
+    <section id="storyCard" class="card story-card hidden">
+      <div class="story-layout">
+        <div class="cover-wrapper">
+          <img id="storyCover" class="story-cover" src="" alt="Story Cover" />
+          <div class="cover-shine"></div>
+        </div>
+        <div class="story-meta">
+          <div class="story-badges">
+            <span id="storyStatus" class="badge"></span>
+            <span id="storyChapterCount" class="badge badge-chapters"></span>
+          </div>
+          <h1 id="storyTitle" class="story-title"></h1>
+          <p id="storyAuthor" class="story-author"></p>
+          <p id="storyDesc" class="story-desc"></p>
+
+          <div class="story-stats">
+            <div class="stat">
+              <span class="stat-icon">👁️</span>
+              <span id="storyViews" class="stat-value"></span>
+              <span class="stat-label">views</span>
+            </div>
+            <div class="stat">
+              <span class="stat-icon">⭐</span>
+              <span id="storyVotes" class="stat-value"></span>
+              <span class="stat-label">votes</span>
+            </div>
+          </div>
+
+          <button id="downloadBtn" class="btn btn-download" onclick="downloadPDF()">
+            <span class="btn-icon">📄</span>
+            <span class="btn-text">Download as PDF</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Chapter List -->
+      <div class="chapters-section">
+        <h2 class="chapters-heading">Chapters</h2>
+        <ol id="chapterList" class="chapter-list"></ol>
+      </div>
+    </section>
+
+    <!-- Progress Card (hidden until download starts) -->
+    <section id="progressCard" class="card progress-card hidden">
+      <div class="progress-header">
+        <span class="progress-icon spinning">⚙️</span>
+        <div>
+          <p class="progress-title">Generating your PDF…</p>
+          <p id="progressSubtitle" class="progress-subtitle">Fetching story content, please wait</p>
+        </div>
+      </div>
+      <div class="progress-bar-track">
+        <div id="progressBar" class="progress-bar-fill"></div>
+      </div>
+      <p class="progress-note">Large or mature stories may take longer. If chapters are empty, check server logs and add
+        Wattpad cookies.</p>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>For personal use only &bull; Respect authors' rights &bull; Do not distribute content without permission</p>
+  </footer>
+
+  <script src="app.js?v=4"></script>
+</body>
+
+</html>
